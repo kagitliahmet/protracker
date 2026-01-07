@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProTakip | Study Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 800: '#075985', 900: '#0c4a6e' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; }
+        .card-shadow { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .card-shadow:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .modal-bg { backdrop-filter: blur(4px); transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+
+    <!-- Cookie Banner -->
+    <div id="cookieBanner" class="fixed bottom-6 left-6 right-6 md:left-auto md:right-10 md:w-96 bg-white border-2 border-primary-500 shadow-2xl z-[100] p-5 rounded-2xl hidden animate-fade-in">
+        <div class="flex items-start gap-4">
+            <div class="bg-primary-100 p-3 rounded-xl text-primary-600"><i class="fas fa-cookie-bite text-xl"></i></div>
+            <div>
+                <h3 class="font-bold text-slate-800" data-i18n="cookie_title">Veri Saklama İzni</h3>
+                <p class="text-slate-500 text-sm mt-1" data-i18n="cookie_desc">Verilerinizin kaydedilmesi için izniniz gerekiyor.</p>
+                <div class="flex gap-2 mt-4">
+                    <button onclick="acceptCookies()" class="flex-1 bg-primary-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 transition" data-i18n="cookie_accept">Kabul Et</button>
+                    <button onclick="rejectCookies()" class="flex-1 bg-slate-100 text-slate-600 py-2 rounded-lg text-sm font-semibold hover:bg-slate-200 transition" data-i18n="cookie_reject">Reddet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Confirmation Modal (Alert/Confirm Yerine) -->
+    <div id="confirmModal" class="fixed inset-0 z-[110] hidden flex items-center justify-center p-4 modal-bg bg-slate-900/40">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center animate-fade-in">
+            <div id="confirmIcon" class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3 id="confirmTitle" class="text-lg font-bold text-slate-800 mb-2">Emin misiniz?</h3>
+            <p id="confirmMessage" class="text-slate-500 text-sm mb-6">Bu işlem geri alınamaz.</p>
+            <div class="flex gap-3">
+                <button onclick="closeConfirm(false)" class="flex-1 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-semibold hover:bg-slate-200 transition" data-i18n="btn_no">Hayır</button>
+                <button id="confirmYesBtn" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition" data-i18n="btn_yes">Evet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Title Modal (Prompt Yerine) -->
+    <div id="titleModal" class="fixed inset-0 z-[110] hidden flex items-center justify-center p-4 modal-bg bg-slate-900/40">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 animate-fade-in">
+            <h3 class="text-lg font-bold text-slate-800 mb-4" data-i18n="modal_title_edit">Başlığı Düzenle</h3>
+            <input type="text" id="titleInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 mb-4">
+            <div class="flex gap-3">
+                <button onclick="toggleModal('titleModal')" class="flex-1 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-semibold hover:bg-slate-200 transition" data-i18n="btn_close">Kapat</button>
+                <button onclick="saveNewTitle()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition" data-i18n="btn_save">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-md bg-white/80">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex flex-col lg:flex-row justify-between items-center gap-6">
+                <div class="flex items-center gap-4 group cursor-pointer" onclick="openTitleModal()">
+                    <div class="bg-primary-600 p-3 rounded-2xl shadow-lg"><i class="fas fa-layer-group text-white text-xl"></i></div>
+                    <div>
+                        <h1 id="pageTitleText" class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <span data-i18n="app_name">Çalışma Takip Sistemi</span>
+                            <i class="fas fa-pen text-[10px] text-slate-400"></i>
+                        </h1>
+                        <p class="text-slate-400 text-xs font-medium uppercase tracking-wider" data-i18n="app_subtitle">İlerlemeyi Takip Et</p>
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap items-center justify-center gap-3 w-full lg:w-auto">
+                    <div class="flex bg-slate-100 p-1 rounded-xl">
+                        <button onclick="setLanguage('tr')" id="lang-tr" class="px-3 py-1.5 rounded-lg text-xs font-bold transition">TR</button>
+                        <button onclick="setLanguage('en')" id="lang-en" class="px-3 py-1.5 rounded-lg text-xs font-bold transition">EN</button>
+                    </div>
+
+                    <div class="relative flex-grow md:flex-grow-0">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="searchInput" oninput="filterItems()" class="w-full md:w-48 pl-10 pr-4 py-2 bg-slate-100 border-transparent border focus:bg-white focus:ring-2 focus:ring-primary-500 rounded-xl text-sm outline-none transition-all">
+                    </div>
+                    
+                    <button onclick="toggleModal('addModal')" class="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2">
+                        <i class="fas fa-plus"></i> <span data-i18n="btn_add">Yeni Ekle</span>
+                    </button>
+
+                    <button onclick="toggleModal('settingsModal')" class="p-2 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-xl transition">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <!-- Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <p class="text-slate-400 text-[10px] font-bold uppercase" data-i18n="stat_total">Toplam Konu</p>
+                <h4 id="statTotal" class="text-2xl font-bold text-slate-800">0</h4>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <p class="text-slate-400 text-[10px] font-bold uppercase" data-i18n="stat_repeats">Toplam Tekrar</p>
+                <h4 id="statRepeats" class="text-2xl font-bold text-primary-600">0</h4>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <p class="text-slate-400 text-[10px] font-bold uppercase" data-i18n="stat_completed">Tamamlanan</p>
+                <h4 id="statCompleted" class="text-2xl font-bold text-green-500">0</h4>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <p class="text-slate-400 text-[10px] font-bold uppercase" data-i18n="stat_visible">Listelenen</p>
+                <h4 id="itemCount" class="text-2xl font-bold text-orange-400">0</h4>
+            </div>
+        </div>
+
+        <div id="itemsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+
+        <div id="emptyState" class="hidden flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+            <i class="fas fa-clipboard text-slate-200 text-6xl mb-4"></i>
+            <h3 class="text-xl font-bold text-slate-800" data-i18n="empty_title">Liste Boş</h3>
+            <p class="text-slate-500 mb-6" data-i18n="empty_desc">Henüz bir konu eklemediniz.</p>
+        </div>
+    </main>
+
+    <!-- Modal: Add -->
+    <div id="addModal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4 modal-bg bg-slate-900/40">
+        <div class="absolute inset-0" onclick="toggleModal('addModal')"></div>
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl z-10 p-6 overflow-hidden animate-fade-in">
+            <h2 class="text-xl font-bold text-slate-800 mb-4" data-i18n="modal_add_title">Yeni Ekle</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1" data-i18n="label_subject">Konu Adı</label>
+                    <input type="text" id="newItemName" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500">
+                </div>
+                <button onclick="addNewItem()" class="w-full bg-primary-600 text-white py-3 rounded-xl font-bold hover:bg-primary-700 transition" data-i18n="btn_save">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Settings -->
+    <div id="settingsModal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4 modal-bg bg-slate-900/40">
+        <div class="absolute inset-0" onclick="toggleModal('settingsModal')"></div>
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl z-10 p-6 animate-fade-in">
+            <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <i class="fas fa-cog text-slate-400"></i> <span data-i18n="settings_title">Ayarlar</span>
+            </h2>
+            <div class="space-y-4">
+                <button onclick="exportData()" class="w-full flex items-center justify-center gap-2 bg-slate-50 border border-slate-200 py-3 rounded-xl font-semibold hover:bg-slate-100 transition">
+                    <i class="fas fa-download text-primary-500"></i> <span data-i18n="btn_export">Verileri İndir</span>
+                </button>
+                <label class="w-full flex items-center justify-center gap-2 bg-slate-50 border border-slate-200 py-3 rounded-xl font-semibold hover:bg-slate-100 transition cursor-pointer">
+                    <i class="fas fa-upload text-green-500"></i> <span data-i18n="btn_import">Veri Yükle (Import)</span>
+                    <input type="file" id="importInput" class="hidden" accept=".json" onchange="importData(event)">
+                </label>
+                <button onclick="confirmReset()" class="w-full bg-red-50 text-red-600 py-3 rounded-xl font-bold hover:bg-red-100 transition" data-i18n="btn_reset">Tüm Verileri Sıfırla</button>
+            </div>
+            <button onclick="toggleModal('settingsModal')" class="w-full mt-4 text-slate-400 text-sm font-semibold" data-i18n="btn_close">Kapat</button>
+        </div>
+    </div>
+
+    <script>
+        const translations = {
+            tr: {
+                app_name: "Çalışma Takip Sistemi",
+                app_subtitle: "İlerlemeyi Takip Et",
+                search_placeholder: "Ara...",
+                btn_add: "Yeni Ekle",
+                stat_total: "Toplam Konu",
+                stat_repeats: "Toplam Tekrar",
+                stat_completed: "Tamamlanan",
+                stat_visible: "Listelenen",
+                empty_title: "Henüz bir konu yok",
+                empty_desc: "Yeni bir tane ekleyerek hemen başlayın!",
+                modal_add_title: "Yeni Konu Ekle",
+                label_subject: "Konu / Başlık Adı",
+                btn_save: "Listeye Ekle",
+                settings_title: "Ayarlar & Yedekleme",
+                btn_export: "Verileri Dışa Aktar",
+                btn_import: "Veri Yükle (Import)",
+                btn_reset: "Tüm Verileri Temizle",
+                btn_close: "Kapat",
+                cookie_title: "Veri Saklama İzni",
+                cookie_desc: "Verilerinizin kaydedilmesi için izniniz gerekiyor.",
+                cookie_accept: "Kabul Et",
+                cookie_reject: "Reddet",
+                repeat_label: "TEKRAR",
+                note_placeholder: "Not yaz...",
+                confirm_delete_title: "Silmek üzeresiniz",
+                confirm_delete_msg: "Bu maddeyi listeden kaldırmak istediğinize emin misiniz?",
+                confirm_reset_title: "DİKKAT!",
+                confirm_reset_msg: "Tüm verileriniz kalıcı olarak silinecek. Emin misiniz?",
+                modal_title_edit: "Başlığı Düzenle",
+                btn_yes: "Evet",
+                btn_no: "Hayır"
+            },
+            en: {
+                app_name: "Study Tracker",
+                app_subtitle: "Track Your Progress",
+                search_placeholder: "Search...",
+                btn_add: "Add New",
+                stat_total: "Total Topics",
+                stat_repeats: "Total Repeats",
+                stat_completed: "Completed",
+                stat_visible: "Visible",
+                empty_title: "List is Empty",
+                empty_desc: "Start by adding a new topic!",
+                modal_add_title: "Add New Topic",
+                label_subject: "Topic Title",
+                btn_save: "Add to List",
+                settings_title: "Settings",
+                btn_export: "Export Data",
+                btn_import: "Import Data",
+                btn_reset: "Reset All",
+                btn_close: "Close",
+                cookie_title: "Data Storage",
+                cookie_desc: "We need permission to save your data locally.",
+                cookie_accept: "Accept",
+                cookie_reject: "Reject",
+                repeat_label: "REPEATS",
+                note_placeholder: "Notes...",
+                confirm_delete_title: "Are you sure?",
+                confirm_delete_msg: "Do you want to remove this item from the list?",
+                confirm_reset_title: "WARNING!",
+                confirm_reset_msg: "All your data will be permanently deleted!",
+                modal_title_edit: "Edit Title",
+                btn_yes: "Yes",
+                btn_no: "No"
+            }
+        };
+
+        let currentLang = localStorage.getItem('appLang') || 'tr';
+        let itemsData = [];
+        let cookiesAccepted = localStorage.getItem('cookieConsent') === 'accepted';
+        let pendingAction = null;
+
+        // --- Custom Confirmation Logic ---
+        function openConfirm(title, message, onYes) {
+            document.getElementById('confirmTitle').innerText = title;
+            document.getElementById('confirmMessage').innerText = message;
+            document.getElementById('confirmModal').classList.remove('hidden');
+            document.getElementById('confirmYesBtn').onclick = () => {
+                onYes();
+                closeConfirm();
+            };
+        }
+
+        function closeConfirm() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        function openTitleModal() {
+            const currentTitle = document.getElementById('pageTitleText').querySelector('span').innerText;
+            document.getElementById('titleInput').value = currentTitle;
+            document.getElementById('titleModal').classList.remove('hidden');
+        }
+
+        function saveNewTitle() {
+            const val = document.getElementById('titleInput').value.trim();
+            if(val) {
+                document.getElementById('pageTitleText').querySelector('span').innerText = val;
+                if(cookiesAccepted) localStorage.setItem('pageTitle', val);
+                toggleModal('titleModal');
+            }
+        }
+
+        // --- Core Functions ---
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('appLang', lang);
+            updateUI();
+            renderItems();
+        }
+
+        function updateUI() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[currentLang][key]) el.innerText = translations[currentLang][key];
+            });
+            document.getElementById('searchInput').placeholder = translations[currentLang].search_placeholder;
+            document.getElementById('lang-tr').className = `px-3 py-1.5 rounded-lg text-xs font-bold ${currentLang === 'tr' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400'}`;
+            document.getElementById('lang-en').className = `px-3 py-1.5 rounded-lg text-xs font-bold ${currentLang === 'en' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400'}`;
+        }
+
+        function loadData() {
+            const data = localStorage.getItem('itemsData');
+            if (data) itemsData = JSON.parse(data);
+            const title = localStorage.getItem('pageTitle');
+            if (title) document.getElementById('pageTitleText').querySelector('span').innerText = title;
+        }
+
+        function saveData() {
+            if (cookiesAccepted) localStorage.setItem('itemsData', JSON.stringify(itemsData));
+            updateStats();
+        }
+
+        function updateStats() {
+            document.getElementById('statTotal').innerText = itemsData.length;
+            document.getElementById('statRepeats').innerText = itemsData.reduce((a, b) => a + b.count, 0);
+            document.getElementById('statCompleted').innerText = itemsData.filter(i => i.count >= 5).length;
+        }
+
+        function renderItems() {
+            const container = document.getElementById('itemsContainer');
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            let filtered = itemsData.filter(i => i.name.toLowerCase().includes(search));
+
+            container.innerHTML = '';
+            document.getElementById('emptyState').classList.toggle('hidden', filtered.length > 0);
+            document.getElementById('itemCount').innerText = filtered.length;
+
+            filtered.forEach(item => {
+                const statusColor = item.count === 0 ? "bg-slate-200" : (item.count < 3 ? "bg-amber-400" : (item.count < 5 ? "bg-emerald-400" : "bg-primary-600"));
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-2xl border border-slate-200 card-shadow flex flex-col h-full relative group animate-fade-in";
+                card.innerHTML = `
+                    <div class="h-1.5 w-full rounded-t-2xl ${statusColor}"></div>
+                    <button onclick="confirmDeleteItem('${item.id}')" class="absolute top-4 right-4 text-slate-300 hover:text-red-500 transition p-2"><i class="fas fa-trash-alt"></i></button>
+                    <div class="p-5 flex-grow">
+                        <h3 class="font-bold text-slate-800 mb-4 pr-8 line-clamp-2">${item.name}</h3>
+                        <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
+                            <button onclick="changeCount('${item.id}', -1)" class="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:text-red-500 transition flex items-center justify-center shadow-sm">-</button>
+                            <div class="text-center">
+                                <p class="text-[9px] text-slate-400 uppercase font-black">${translations[currentLang].repeat_label}</p>
+                                <span class="text-xl font-bold text-slate-700">${item.count}</span>
+                            </div>
+                            <button onclick="changeCount('${item.id}', 1)" class="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:text-primary-600 transition flex items-center justify-center shadow-sm">+</button>
+                        </div>
+                        <textarea oninput="updateNote('${item.id}', this.value)" class="w-full bg-slate-50 text-slate-600 text-xs rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary-300 transition resize-none min-h-[60px]" placeholder="${translations[currentLang].note_placeholder}">${item.note}</textarea>
+                    </div>`;
+                container.appendChild(card);
+            });
+            updateStats();
+        }
+
+        window.addNewItem = function() {
+            const input = document.getElementById('newItemName');
+            if (!input.value.trim()) return;
+            itemsData.unshift({ id: 'id' + Date.now(), name: input.value, count: 0, note: "", date: new Date().toISOString() });
+            input.value = ""; toggleModal('addModal'); saveData(); renderItems();
+        }
+
+        window.confirmDeleteItem = function(id) {
+            openConfirm(translations[currentLang].confirm_delete_title, translations[currentLang].confirm_delete_msg, () => {
+                itemsData = itemsData.filter(i => i.id !== id);
+                saveData();
+                renderItems();
+            });
+        }
+
+        window.confirmReset = function() {
+            openConfirm(translations[currentLang].confirm_reset_title, translations[currentLang].confirm_reset_msg, () => {
+                localStorage.clear();
+                location.reload();
+            });
+        }
+
+        window.changeCount = function(id, delta) {
+            const item = itemsData.find(i => i.id === id);
+            if (item && item.count + delta >= 0) { item.count += delta; saveData(); renderItems(); }
+        }
+
+        window.updateNote = function(id, val) {
+            const item = itemsData.find(i => i.id === id);
+            if (item) { item.note = val; clearTimeout(window.saveT); window.saveT = setTimeout(saveData, 1000); }
+        }
+
+        window.toggleModal = function(id) { document.getElementById(id).classList.toggle('hidden'); }
+
+        window.acceptCookies = function() {
+            localStorage.setItem('cookieConsent', 'accepted');
+            cookiesAccepted = true;
+            document.getElementById('cookieBanner').classList.add('hidden');
+            saveData();
+        }
+
+        window.rejectCookies = function() {
+            localStorage.setItem('cookieConsent', 'rejected');
+            cookiesAccepted = false;
+            document.getElementById('cookieBanner').classList.add('hidden');
+        }
+
+        window.exportData = function() {
+            const blob = new Blob([JSON.stringify(itemsData, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'study_data.json'; a.click();
+        }
+
+        window.importData = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        itemsData = imported;
+                        saveData();
+                        renderItems();
+                        toggleModal('settingsModal');
+                    }
+                } catch (err) { console.error("Geçersiz JSON dosyası"); }
+            };
+            reader.readAsText(file);
+        }
+
+        function filterItems() { renderItems(); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const consent = localStorage.getItem('cookieConsent');
+            if (!consent) document.getElementById('cookieBanner').classList.remove('hidden');
+            loadData(); updateUI(); renderItems();
+        });
+    </script>
+</body>
+</html>
